@@ -13,5 +13,25 @@ CREATE TABLE Person (
 );
 
 CREATE TABLE Forum (
-    
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(30) NOT NULL UNIQUE
+);
+
+CREATE TABLE Topic (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(30) NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    forumId INTEGER NOT NULL,
+    personId INTEGER NOT NULL,
+    FOREIGN KEY (personId) REFERENCES Person(id),
+    FOREIGN KEY (forumId) REFERENCES Forum(id)
+);
+
+CREATE TABLE Post (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    message VARCHAR(500) NOT NULL,
+    topicId INTEGER NOT NULL,
+    personId INTEGER NOT NULL,
+    FOREIGN KEY (personId) REFERENCES Person(id),
+    FOREIGN KEY (topicId) REFERENCES Topic(id)
 );
