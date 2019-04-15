@@ -2,11 +2,13 @@ package uk.ac.bris.cs.databases.cwk2;
 
 import java.sql.Connection;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import uk.ac.bris.cs.databases.api.APIProvider;
 import uk.ac.bris.cs.databases.api.AdvancedForumSummaryView;
 import uk.ac.bris.cs.databases.api.AdvancedForumView;
@@ -44,39 +46,98 @@ public class API implements APIProvider {
             PreparedStatement s = this.c.prepareStatement(
                 "SELECT name, username FROM Person;"
             );
-
             ResultSet r = s.executeQuery();
             while (r.next()) {
                 name = r.getString("name");
                 username = r.getString("username");
-
                 map.put(name,username);
             }
-
             s.close();
-
         } catch (SQLException e) {
             return Result.fatal(e.getMessage());
-        }
-
+            }
         return Result.success(map);
     }
 
     @Override
     public Result<PersonView> getPersonView(String username) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
+
+      PersonView person = null;
+      String query = "SELECT * FROM Person WHERE username = '" + username +"';";
+
+      try {
+          PreparedStatement s = this.c.prepareStatement(
+              query
+          );
+
+          ResultSet r = s.executeQuery();
+
+          while (r.next()) {
+
+            String name = r.getString("name");
+            String user = r.getString("username");
+            String studentId = r.getString("stuId");
+            person = new PersonView(name, username, studentId);
+          }
+
+          s.close();
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success(person);    }
 
     @Override
     public Result addNewPerson(String name, String username, String studentId) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
+
+
+            try {
+String query = "INSERT INTO Person (name, username, stuId) VALUES ('" + name + "', '" + username + "', '" + studentId  + "');";
+
+                Statement s = this.c.createStatement();
+
+                int c = s.executeUpdate(query);
+
+                s.close();
+
+            } catch (SQLException e) {
+                return Result.fatal(e.getMessage());
+            }
+
+            return Result.success();
+        }
 
     /* A.2 */
 
     @Override
     public Result<List<SimpleForumSummaryView>> getSimpleForums() {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      String query = "SELECT * FROM Forum;";
+      List<SimpleForumSummaryView> list = new ArrayList<SimpleForumSummaryView>();
+
+      try {
+          PreparedStatement s = this.c.prepareStatement(
+              query
+          );
+
+          ResultSet r = s.executeQuery();
+
+          while (r.next()) {
+            int id = r.getInt("id");
+            String name = r.getString("name");
+            SimpleForumSummaryView forum = new SimpleForumSummaryView(id, name);
+            list.add(forum);
+          }
+
+          s.close();
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success(list);
+
     }
 
     @Override
