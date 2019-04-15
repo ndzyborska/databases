@@ -63,12 +63,14 @@ public class API implements APIProvider {
     public Result<PersonView> getPersonView(String username) {
 
       PersonView person = null;
-      String query = "SELECT * FROM Person WHERE username = '" + username +"';";
+      String query = "SELECT * FROM Person WHERE username = ?;";
 
       try {
           PreparedStatement s = this.c.prepareStatement(
               query
           );
+
+          s.setString(1, username);
 
           ResultSet r = s.executeQuery();
 
@@ -91,15 +93,17 @@ public class API implements APIProvider {
     @Override
     public Result addNewPerson(String name, String username, String studentId) {
 
+    try {
 
-            try {
-String query = "INSERT INTO Person (name, username, stuId) VALUES ('" + name + "', '" + username + "', '" + studentId  + "');";
+      String query = "INSERT INTO Person (name, username, stuId) VALUES (?, ?, ?);";
+      PreparedStatement s = this.c.prepareStatement(
+          query
+      );
 
-                Statement s = this.c.createStatement();
-
-                int c = s.executeUpdate(query);
-
-                s.close();
+      s.setString(1, name);
+      s.setString(2, username);
+      s.setString(3, studentId);
+      s.close();
 
             } catch (SQLException e) {
                 return Result.fatal(e.getMessage());
@@ -142,7 +146,7 @@ String query = "INSERT INTO Person (name, username, stuId) VALUES ('" + name + "
 
     @Override
     public Result createForum(String title) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
     }
 
     /* A.3 */
