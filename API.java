@@ -2,9 +2,9 @@ package uk.ac.bris.cs.databases.cwk2;
 
 import java.sql.Connection;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -20,7 +20,9 @@ import uk.ac.bris.cs.databases.api.Result;
 import uk.ac.bris.cs.databases.api.PersonView;
 import uk.ac.bris.cs.databases.api.SimpleForumSummaryView;
 import uk.ac.bris.cs.databases.api.SimpleTopicView;
+import uk.ac.bris.cs.databases.api.SimpleTopicSummaryView;
 import uk.ac.bris.cs.databases.api.TopicView;
+import uk.ac.bris.cs.databases.api.SimplePostView;
 
 /**
  *
