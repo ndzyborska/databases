@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS PostLikes;
+DROP TABLE IF EXISTS TopicLikes;
 DROP TABLE IF EXISTS Post;
 DROP TABLE IF EXISTS Topic;
 DROP TABLE IF EXISTS Forum;
@@ -30,6 +32,23 @@ CREATE TABLE Post (
     message VARCHAR(500) NOT NULL,
     topicId INTEGER NOT NULL,
     personId INTEGER NOT NULL,
+    timePosted DATETIME NOT NULL,
     FOREIGN KEY (personId) REFERENCES Person(id),
     FOREIGN KEY (topicId) REFERENCES Topic(id)
+);
+
+CREATE TABLE PostLikes (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    postId INTEGER NOT NULL,
+    personId INTEGER NOT NULL,
+    FOREIGN KEY (postId) REFERENCES Post(id),
+    FOREIGN KEY (personId) REFERENCES Person(id)
+);
+
+CREATE TABLE TopicLikes (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    topicId INTEGER NOT NULL,
+    personId INTEGER NOT NULL,
+    FOREIGN KEY (topicId) REFERENCES Topic(id),
+    FOREIGN KEY (personId) REFERENCES Person(id)
 );
