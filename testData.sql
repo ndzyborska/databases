@@ -27,22 +27,3 @@ INSERT INTO Post (message,topicId,personId) VALUES ("testx post in topic",3,2);
 INSERT INTO Post (message,topicId,personId) VALUES ("testx post in topic 2",4,2);
 INSERT INTO Post (message,topicId,personId) VALUES ("testx post in topic",5,1);
 INSERT INTO Post (message,topicId,personId) VALUES ("testx post in topic 2",6,1);
-
-
-SELECT Post.message, Post.id, Person.username, Person.name, Post.timePosted, Topic.forumId, Topic.title FROM
-(
-SELECT MAX(Post.timePosted) AS mptp FROM Post WHERE Post.topicId = 1
-) a
-JOIN Post ON Post.id = a.mptp
-JOIN Person ON Person.id = Post.personId
-JOIN Topic ON Topic.id = Post.topicId;
-
-
-SELECT Post.message, Post.id, Person.username, Person.name, Post.timePosted, Topic.forumId, Topic.title, COUNT(b.id) FROM
-(
-SELECT MAX(Post.timePosted) AS mptp FROM Post WHERE Post.topicId = 7
-) a
-JOIN Post ON Post.id = a.mptp
-JOIN Person ON Person.id = Post.personId
-JOIN Topic ON Topic.id = Post.topicId
-JOIN ( SELECT * FROM PostLikes ) b ON b.postId = Post.id;
