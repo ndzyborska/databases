@@ -105,7 +105,10 @@ public class API implements APIProvider {
             s.setString(1, name);
             s.setString(2, username);
             s.setString(3, studentId);
+            s.executeQuery();
+
             s.close();
+
 
             } catch (SQLException e) {
                 return Result.fatal(e.getMessage());
@@ -119,7 +122,7 @@ public class API implements APIProvider {
     @Override
     public Result<List<SimpleForumSummaryView>> getSimpleForums() {
 
-      String query = "SELECT * FROM Forum;";
+      String query = "SELECT * FROM Forum ORDER BY name;";
       List<SimpleForumSummaryView> list = new ArrayList<SimpleForumSummaryView>();
 
       try {
@@ -148,19 +151,103 @@ public class API implements APIProvider {
 
     @Override
     public Result createForum(String title) {
-        throw new UnsupportedOperationException("Test edit");
+      try {
+
+        String query = "INSERT INTO Forum (name) VALUES (?);";
+        PreparedStatement s = this.c.prepareStatement(
+            query
+        );
+        s.setString(1, title);
+        s.executeQuery();
+        s.close();
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success();
     }
 
     /* A.3 */
 
     @Override
     public Result<List<ForumSummaryView>> getForums() {
-        throw new UnsupportedOperationException("Test edit");
-    }
+
+      String query = "SELECT Forum.name, Forum.id, Topic.title, Topic.id FROM Forum JOIN Topic ON Forum.id = Topic.forumId ORDER BY Forum.name";
+      List<ForumSummaryView> list = new ArrayList<ForumSummaryView>();
+
+      try {
+          PreparedStatement s = this.c.prepareStatement(
+              query
+          );
+
+          ResultSet r = s.executeQuery();
+
+          while (r.next()) {
+            int id = r.getInt("Forum.id");
+            String name = r.getString("Forum.name");
+            String topicName = r.getString("Topic.title");
+            int topicid = r.getInt("Topic.id");
+
+            SimpleTopicSummaryView topic = new SimpleTopicSummaryView(topicid, id, topicName);
+            ForumSummaryView forum = new ForumSummaryView(id, name, topic);
+
+            list.add(forum);
+          }
+
+          s.close();
+          r.close();
+
+      } catch (SQLException e) {
+        System.out.print("error caught");
+          return Result.fatal(e.getMessage());
+
+      }
+
+      return Result.success(list);    }
 
     @Override
     public Result<ForumView> getForum(int id) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      ForumView forum = null;
+      String query = "SELECT title, id FROM Topic";
+      List<SimpleTopicSummaryView> topicList = new ArrayList<SimpleTopicSummaryView>();
+
+      try {
+          PreparedStatement s = this.c.prepareStatement(
+              query
+          );
+
+          ResultSet r = s.executeQuery();
+
+          while (r.next()) {
+            String topicName = r.getString("title");
+            int topicid = r.getInt("id");
+            SimpleTopicSummaryView topic = new SimpleTopicSummaryView(topicid, id, topicName);
+            topicList.add(topic);
+
+          }
+          s.close();
+          r.close();
+
+          PreparedStatement s2 = this.c.prepareStatement("SELECT name FROM Forum WHERE id = ?");
+          s2.setInt(1, id);
+
+          ResultSet r2 = s2.executeQuery();
+          if (r2.next()) {
+            String name = r2.getString("name");
+            forum = new ForumView(id, name, topicList);
+          }
+
+          s2.close();
+          r2.close();
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success(forum);
+
     }
 
     @Override
@@ -272,7 +359,7 @@ public class API implements APIProvider {
         //TODO: implement check for if topic exists
         try {
             PreparedStatement t = this.c.prepareStatement(
-                "SELECT Person.id FROM Person WHERE Person.username = ?;"
+                "SELECT Person.id FROM Person WHERE Person.name = ?;"
             );
             t.setString(1,username);
             ResultSet q = t.executeQuery();
@@ -319,9 +406,10 @@ public class API implements APIProvider {
             return Result.failure("createTopic: text cannot be empty!");
         }
         try {
+          System.out.print(username);
 
             PreparedStatement s = this.c.prepareStatement(
-                "SELECT Person.id FROM Person WHERE Person.username = ?;"
+                "SELECT id FROM Person WHERE Person.name = ?;" //For some reason name (i.e. UserD) is being inserted instead of username....
             );
             s.setString(1,username);
             ResultSet r = s.executeQuery();
@@ -374,7 +462,30 @@ public class API implements APIProvider {
 
     @Override
     public Result<Integer> countPostsInTopic(int topicId) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+            int count = 0;
+            String query = "SELECT COUNT(Post.id) AS count FROM Post JOIN Topic ON Post.topicId = Topic.id WHERE Topic.id = ?";
+
+            try {
+                PreparedStatement s = this.c.prepareStatement(
+                    query
+                );
+
+                s.setInt(1, topicId);
+                ResultSet r = s.executeQuery();
+
+                if (r.next()) {
+                  count = r.getInt("count");
+                }
+                s.close();
+                r.close();
+
+
+            } catch (SQLException e) {
+                return Result.fatal(e.getMessage());
+            }
+
+            return Result.success(count);
     }
 
     /* B.1 */
