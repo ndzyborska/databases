@@ -52,12 +52,16 @@ public class API implements APIProvider {
             while (r.next()) {
                 name = r.getString("name");
                 username = r.getString("username");
-                map.put(name,username);
+
+                map.put(username,name);
             }
+
             s.close();
+
         } catch (SQLException e) {
             return Result.fatal(e.getMessage());
-            }
+        }
+        
         return Result.success(map);
     }
 
