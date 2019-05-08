@@ -212,11 +212,22 @@ public class API implements APIProvider {
     @Override
     public Result<List<ForumSummaryView>> getForums() {
 
+      SimpleTopicSummaryView topic;
+      String temp;
+      int topicId;
       List<ForumSummaryView> list = new ArrayList<ForumSummaryView>();
 
       try {
           PreparedStatement s = this.c.prepareStatement(
-              "SELECT Forum.name, Forum.id, Topic.title, Topic.id FROM Forum JOIN Topic ON Forum.id = Topic.forumId ORDER BY Forum.name"
+              "SELECT Forum.id, Forum.name, Topic.id, Topic.title, Post.timePosted FROM Post " +
+              "JOIN ( " +
+              "    SELECT MAX(Post.timePosted) AS maxTime FROM Post " +
+              "    JOIN Topic ON Topic.id = Post.topicId " +
+              "    JOIN Forum ON Forum.id = Topic.forumId " +
+              "    GROUP BY Forum.id ) a ON a.maxTime = Post.timePosted " +
+              "JOIN Topic ON Topic.id = Post.topicId " +
+              "RIGHT OUTER JOIN Forum ON Forum.id = Topic.forumId " +
+              "ORDER BY Forum.name;"
           );
 
           ResultSet r = s.executeQuery();
@@ -225,12 +236,17 @@ public class API implements APIProvider {
             int id = r.getInt("Forum.id");
             String name = r.getString("Forum.name");
             String topicName = r.getString("Topic.title");
-            int topicid = r.getInt("Topic.id");
+            temp = r.getString("Topic.id");
 
-            SimpleTopicSummaryView topic = new SimpleTopicSummaryView(topicid, id, topicName);
-            ForumSummaryView forum = new ForumSummaryView(id, name, topic);
+            if (temp == null) {
+                list.add(new ForumSummaryView(id,name,null));
+            }
+            else {
+                topicId = Integer.parseInt(temp);
+                topic = new SimpleTopicSummaryView(topicId, id, topicName);
+                list.add(new ForumSummaryView(id, name, topic));
+            }
 
-            list.add(forum);
           }
 
           s.close();
@@ -638,7 +654,72 @@ public class API implements APIProvider {
 
     @Override
     public Result<TopicView> getTopic(int topicId) {
-        
+        List<PostView> posts = new ArrayList<PostView>();
+        int forumId;
+        String forumName;
+        String title;
+        int postNumber = 0;
+        String authorName;
+        String authorUserName;
+        String text;
+        String postedAt;
+        int likes;
+
+        try {
+
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT Forum.Id, Forum.Name, Topic.title FROM Topic " +
+                "JOIN Forum ON Forum.id = Topic.forumId " +
+                "WHERE Topic.id = ?;"
+            );
+
+            s.setInt(1,topicId);
+
+            ResultSet r = s.executeQuery();
+
+            if (r.next()) {
+                forumName = r.getString("Forum.Name");
+                forumId = r.getInt("Forum.Id");
+                title = r.getString("Topic.title");
+            }
+            else return Result.failure("geTopic: topic with this id does not exist!");
+
+            s.close();
+            r.close();
+
+            s = this.c.prepareStatement(
+                "SELECT Post.id, Person.name, Person.username," +
+                "       Post.message, Post.timePosted, a.likes FROM Post " +
+                "JOIN Person ON Person.id = Post.personId " +
+                "LEFT OUTER JOIN ( " +
+                "    SELECT postId, COUNT(*) AS likes FROM PostLikes GROUP BY postId " +
+                ") a ON a.postId = Post.id " +
+                "WHERE Post.topicId = ? " +
+                "ORDER BY Post.timePosted ASC;"
+            );
+
+            s.setInt(1,topicId);
+            r = s.executeQuery();
+
+            while (r.next()) {
+                ++postNumber;
+                authorName = r.getString("Person.name");
+                authorUserName = r.getString("Person.username");
+                text = r.getString("Post.message");
+                postedAt = r.getString("Post.timePosted");
+                likes = r.getInt("a.likes");
+                posts.add(new PostView(forumId,topicId,postNumber,authorName,authorUserName,text,postedAt,likes));
+            }
+
+            r.close();
+            s.close();
+
+
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
+
+        return Result.success(new TopicView(forumId,topicId,forumName,title,posts));
     }
 
     /* B.2 */
