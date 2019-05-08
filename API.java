@@ -22,6 +22,7 @@ import uk.ac.bris.cs.databases.api.SimpleForumSummaryView;
 import uk.ac.bris.cs.databases.api.SimpleTopicView;
 import uk.ac.bris.cs.databases.api.SimpleTopicSummaryView;
 import uk.ac.bris.cs.databases.api.TopicView;
+import uk.ac.bris.cs.databases.api.TopicSummaryView;
 import uk.ac.bris.cs.databases.api.SimplePostView;
 
 /**
@@ -554,7 +555,90 @@ public class API implements APIProvider {
 
     @Override
     public Result likeTopic(String username, int topicId, boolean like) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      if (username == "" || username == null) return Result.failure("likeTopic: username cannot be empty!");
+
+      try {
+          int personId;
+
+          PreparedStatement s = this.c.prepareStatement(
+              "SELECT id FROM Person WHERE username = ?;"
+          );
+
+          s.setString(1,username);
+          ResultSet r = s.executeQuery();
+
+          if (r.next())  personId = r.getInt("id");
+          else return Result.failure("likeTopic: no person with this username exists!");
+
+          r.close();
+          s.close();
+
+          s = this.c.prepareStatement(
+              "SELECT id FROM Topic WHERE id = ?"
+          );
+
+          s.setInt(1,topicId);
+          r = s.executeQuery();
+
+          if (!r.next()) return Result.failure("likeTopic: topic id does not exist!");
+
+          r.close();
+          s.close();
+
+          s = this.c.prepareStatement(
+              "SELECT * FROM TopicLikes WHERE topicId = ? AND personId = ?;"
+          );
+
+          s.setInt(1,topicId);
+          s.setInt(2,personId);
+
+          r = s.executeQuery();
+          s.close();
+
+          if (r.next()) {
+              if (like) return Result.failure("likeTopic: topic has already been liked!");
+              else {
+                  s = this.c.prepareStatement(
+                      "DELETE FROM TopicLikes WHERE TopicId = ? AND personId = ?;"
+                  );
+
+                  s.setInt(1,topicId);
+                  s.setInt(2,personId);
+
+                  s.executeQuery();
+                  s.close();
+              }
+          }
+          else {
+              if (like) {
+                  s = this.c.prepareStatement(
+                      "INSERT INTO TopicLikes (topicId,personId) VALUES (?,?);"
+                  );
+
+                  s.setInt(1,topicId);
+                  s.setInt(2,personId);
+
+                  s.executeQuery();
+                  s.close();
+              }
+              else return Result.failure("likeTopic: cannot unlike topic that has not been liked!");
+          }
+
+          c.commit();
+
+
+      } catch (SQLException e) {
+          try {
+              c.rollback();
+          } catch (SQLException f) {
+              return Result.fatal(f.getMessage());
+          }
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success();
+
     }
 
     @Override
@@ -649,7 +733,55 @@ public class API implements APIProvider {
 
     @Override
     public Result<List<PersonView>> getLikers(int topicId) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      List<PersonView> likers = new ArrayList<PersonView>();
+      String name;
+      String username;
+      String studentId;
+
+
+      try {
+
+         PreparedStatement s = this.c.prepareStatement(
+             "SELECT id FROM topic WHERE id = ?"
+          );
+
+          ResultSet r = s.executeQuery();
+          if (!r.next()) {
+            return Result.failure("getLikers: topic with this id does not exist!");
+          }
+          s.close();
+          r.close();
+
+
+          s = this.c.prepareStatement(
+          "SELECT TopicLikes.personId, Person.name, Person.username, Person.stuId FROM TopicLikes " +
+          "JOIN Person ON TopicLikes.personId = Person.id " +
+          "WHERE topicId = ? " +
+          "ORDER BY personId;"
+          );
+
+          s.setInt(1,topicId);
+
+          r = s.executeQuery();
+
+          while (r.next()) {
+              name = r.getString("Person.name");
+              username = r.getString("Person.username");
+              studentId = r.getString("Person.stuId");
+              likers.add(new PersonView(name, username, studentId));
+          }
+
+          r.close();
+          s.close();
+
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success(likers);
+
     }
 
     @Override
@@ -731,7 +863,120 @@ public class API implements APIProvider {
 
     @Override
     public Result<AdvancedPersonView> getAdvancedPersonView(String username) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+        if (username == null || username == "") {
+            return Result.failure("getPersonView: username cannot be empty!");
+        }
+
+        List<TopicSummaryView> likedTopics = new ArrayList<TopicSummaryView>();
+        int personId;
+        String name;
+        String studentId;
+        int topicLikes;
+        int postLikes;
+
+        int topicId;
+        int forumId;
+        String title;
+        String dateCreated;
+        String lastPostDate;
+        int postCount;
+        String lastPostName;
+        String topicCreatorName;
+        String topicCreatorUsername;
+        int likes;
+
+        try {
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT Person.id, Person.name, Person.stuId, a.count, b.count FROM Person " +
+                "LEFT OUTER JOIN ( " +
+                "    SELECT COUNT(*) AS count, Post.personId AS ppid FROM PostLikes JOIN Post ON Post.id = PostLikes.postId " +
+                "    GROUP BY Post.personId " +
+                ") a ON a.ppid = Person.id " +
+                "LEFT OUTER JOIN ( " +
+                "    SELECT COUNT(*) AS count, Topic.personId AS tpid FROM TopicLikes JOIN Topic ON Topic.id = TopicLikes.topicId " +
+                "    GROUP BY Topic.personId " +
+                ") b ON b.tpid = Person.id " +
+                "WHERE username = ?;"
+            );
+            s.setString(1,username);
+            ResultSet r = s.executeQuery();
+
+            if (r.next()) {
+                personId = r.getInt("Person.id");
+                name = r.getString("Person.name");
+                studentId = r.getString("Person.stuId");
+                postLikes = r.getInt("a.count");
+                topicLikes = r.getInt("b.count");
+            }
+            else return Result.failure("getAdvancedPersonView: no person with this username exists!");
+
+            s.close();
+            r.close();
+
+            s = this.c.prepareStatement(
+                "SELECT "
+            );
+
+            s = this.c.prepareStatement(
+                "SELECT TopicLikes.topicId, Forum.id, Topic.title,a.mtp, b.mtp, c.count, d.count, a.pn, a.pu, b.pn FROM TopicLikes " +
+                "JOIN Topic ON Topic.id = TopicLikes.topicId " +
+                "JOIN Forum ON Forum.id = Topic.forumId " +
+                "JOIN ( " +
+                "    SELECT MIN(Post.timePosted) AS mtp, Post.topicId AS ptid, Person.name AS pn, Person.username AS pu FROM Post " +
+                "    JOIN Person ON Person.id = Post.personId " +
+                "    GROUP BY Post.topicId " +
+                ") a ON a.ptid = TopicLikes.topicId " +
+                "JOIN ( " +
+                "    SELECT MAX(Post.timePosted) AS mtp, Post.topicId AS ptid, Person.name AS pn FROM Post " +
+                "    JOIN Person ON Person.id = Post.personId " +
+                "    GROUP BY Post.topicId " +
+                ") b ON b.ptid = TopicLikes.topicId " +
+                "JOIN ( " +
+                "    SELECT COUNT(*) AS count, TopicLikes.topicId AS tltid FROM TopicLikes " +
+                "    GROUP BY TopicLikes.topicId " +
+                ") c ON c.tltid = TopicLikes.topicId " +
+                "JOIN ( " +
+                "    SELECT COUNT(*) AS count, Post.topicId AS ptid FROM Post " +
+                "    GROUP BY Post.topicId " +
+                ") d ON d.ptid = TopicLikes.topicId " +
+                "WHERE TopicLikes.personId = ? " +
+                "ORDER BY Topic.title ASC;"
+            );
+
+            s.setInt(1,personId);
+
+            r = s.executeQuery();
+
+            while (r.next()) {
+                topicId = r.getInt("TopicLikes.topicId");
+                forumId = r.getInt("Forum.id");
+                title = r.getString("Topic.title");
+                dateCreated = r.getString("a.mtp");
+                lastPostDate = r.getString("b.mtp");
+                postCount = r.getInt("d.count");
+                lastPostName = r.getString("b.pn");
+                topicCreatorName = r.getString("a.pn");
+                topicCreatorUsername = r.getString("a.pu");
+                likes = r.getInt("c.count");
+                likedTopics.add(new TopicSummaryView(
+                    topicId,forumId,title,postCount,
+                    dateCreated,lastPostDate,lastPostName,
+                    likes,topicCreatorName,topicCreatorUsername
+                ));
+            }
+
+            r.close();
+            s.close();
+
+            if (studentId == null) studentId = "";
+
+            return Result.success(new AdvancedPersonView(name,username,studentId,topicLikes,postLikes,likedTopics));
+
+
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
     }
 
     @Override
