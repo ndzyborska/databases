@@ -52,65 +52,84 @@ public class API implements APIProvider {
             while (r.next()) {
                 name = r.getString("name");
                 username = r.getString("username");
-                map.put(name,username);
+
+                map.put(username,name);
             }
+
+            r.close();
             s.close();
+
         } catch (SQLException e) {
             return Result.fatal(e.getMessage());
-            }
+        }
+
         return Result.success(map);
     }
 
     @Override
     public Result<PersonView> getPersonView(String username) {
 
-      PersonView person = null;
-      String query = "SELECT * FROM Person WHERE username = ?;";
+        if (username == "" || username == null) return Result.failure("getPersonView: username cannot be empty!");
 
-      try {
-          PreparedStatement s = this.c.prepareStatement(
-              query
-          );
+        String name;
+        String user;
+        String studentId;
 
-          s.setString(1, username);
+        try {
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT name, username, stuId FROM Person WHERE username = ?;"
+            );
 
-          ResultSet r = s.executeQuery();
+            s.setString(1, username);
 
-          while (r.next()) {
+            ResultSet r = s.executeQuery();
 
-            String name = r.getString("name");
-            String user = r.getString("username");
-            String studentId = r.getString("stuId");
-            person = new PersonView(name, username, studentId);
-          }
+            if (r.next()) {
+                name = r.getString("name");
+                user = r.getString("username");
+                studentId = r.getString("stuId");
+            }
+            else return Result.failure("getPersonView: person with this username does not exist!");
 
-          s.close();
+            r.close();
+            s.close();
 
-      } catch (SQLException e) {
-          return Result.fatal(e.getMessage());
-      }
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
 
-      return Result.success(person);    }
+        if (studentId == null) studentId = "";
+
+        return Result.success(new PersonView(name, username, studentId));
+    }
 
     @Override
     public Result addNewPerson(String name, String username, String studentId) {
 
+        if (name == "" || name == null) return Result.failure("addNewPerson: name cannot be empty!");
+        if (username == "" || username == null) return Result.failure("addNewPerson: username cannot be empty!");
+        if (studentId == "") return Result.failure("addNewPerson: studentId cannot be empty!");
+
         try {
 
-            String query = "INSERT INTO Person (name, username, stuId) VALUES (?, ?, ?);";
             PreparedStatement s = this.c.prepareStatement(
-            query
+                "INSERT INTO Person (name, username, stuId) VALUES (?, ?, ?);"
             );
 
             s.setString(1, name);
             s.setString(2, username);
             s.setString(3, studentId);
+
             s.executeQuery();
-
             s.close();
-
+            c.commit();
 
             } catch (SQLException e) {
+                try {
+                    c.rollback();
+                } catch (SQLException f) {
+                    return Result.fatal(f.getMessage());
+                }
                 return Result.fatal(e.getMessage());
             }
 
@@ -122,24 +141,25 @@ public class API implements APIProvider {
     @Override
     public Result<List<SimpleForumSummaryView>> getSimpleForums() {
 
-      String query = "SELECT * FROM Forum ORDER BY name;";
-      List<SimpleForumSummaryView> list = new ArrayList<SimpleForumSummaryView>();
+        int id;
+        String name;
+        List<SimpleForumSummaryView> list = new ArrayList<SimpleForumSummaryView>();
 
-      try {
-          PreparedStatement s = this.c.prepareStatement(
-              query
-          );
+        try {
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT id, name FROM Forum;"
+            );
 
-          ResultSet r = s.executeQuery();
+            ResultSet r = s.executeQuery();
 
-          while (r.next()) {
-            int id = r.getInt("id");
-            String name = r.getString("name");
-            SimpleForumSummaryView forum = new SimpleForumSummaryView(id, name);
-            list.add(forum);
-          }
+            while (r.next()) {
+                id = r.getInt("id");
+                name = r.getString("name");
+                list.add(new SimpleForumSummaryView(id, name));
+            }
 
-          s.close();
+            r.close();
+            s.close();
 
       } catch (SQLException e) {
           return Result.fatal(e.getMessage());
@@ -151,21 +171,40 @@ public class API implements APIProvider {
 
     @Override
     public Result createForum(String title) {
-      try {
 
-        String query = "INSERT INTO Forum (name) VALUES (?);";
-        PreparedStatement s = this.c.prepareStatement(
-            query
-        );
-        s.setString(1, title);
-        s.executeQuery();
-        s.close();
+        if (title == "" || title == null) return Result.failure("createForum: title cannot be empty!");
 
-      } catch (SQLException e) {
-          return Result.fatal(e.getMessage());
-      }
+        try {
 
-      return Result.success();
+            PreparedStatement t = this.c.prepareStatement(
+                "SELECT * FROM Forum WHERE Forum.name = ?;"
+            );
+            t.setString(1, title);
+            ResultSet q = t.executeQuery();
+
+            if (q.next()) return Result.failure("createForum: forum with this title already exists!");
+            q.close();
+            t.close();
+
+            PreparedStatement s = this.c.prepareStatement(
+                "INSERT INTO Forum (name) VALUES (?);"
+            );
+
+            s.setString(1, title);
+            s.executeQuery();
+            s.close();
+            c.commit();
+
+        } catch (SQLException e) {
+            try {
+                c.rollback();
+            } catch (SQLException f) {
+                return Result.fatal(f.getMessage());
+            }
+            return Result.fatal(e.getMessage());
+        }
+
+        return Result.success();
     }
 
     /* A.3 */
@@ -173,12 +212,22 @@ public class API implements APIProvider {
     @Override
     public Result<List<ForumSummaryView>> getForums() {
 
-      String query = "SELECT Forum.name, Forum.id, Topic.title, Topic.id FROM Forum JOIN Topic ON Forum.id = Topic.forumId ORDER BY Forum.name";
+      SimpleTopicSummaryView topic;
+      String temp;
+      int topicId;
       List<ForumSummaryView> list = new ArrayList<ForumSummaryView>();
 
       try {
           PreparedStatement s = this.c.prepareStatement(
-              query
+              "SELECT Forum.id, Forum.name, Topic.id, Topic.title, Post.timePosted FROM Post " +
+              "JOIN ( " +
+              "    SELECT MAX(Post.timePosted) AS maxTime FROM Post " +
+              "    JOIN Topic ON Topic.id = Post.topicId " +
+              "    JOIN Forum ON Forum.id = Topic.forumId " +
+              "    GROUP BY Forum.id ) a ON a.maxTime = Post.timePosted " +
+              "JOIN Topic ON Topic.id = Post.topicId " +
+              "RIGHT OUTER JOIN Forum ON Forum.id = Topic.forumId " +
+              "ORDER BY Forum.name;"
           );
 
           ResultSet r = s.executeQuery();
@@ -187,12 +236,17 @@ public class API implements APIProvider {
             int id = r.getInt("Forum.id");
             String name = r.getString("Forum.name");
             String topicName = r.getString("Topic.title");
-            int topicid = r.getInt("Topic.id");
+            temp = r.getString("Topic.id");
 
-            SimpleTopicSummaryView topic = new SimpleTopicSummaryView(topicid, id, topicName);
-            ForumSummaryView forum = new ForumSummaryView(id, name, topic);
+            if (temp == null) {
+                list.add(new ForumSummaryView(id,name,null));
+            }
+            else {
+                topicId = Integer.parseInt(temp);
+                topic = new SimpleTopicSummaryView(topicId, id, topicName);
+                list.add(new ForumSummaryView(id, name, topic));
+            }
 
-            list.add(forum);
           }
 
           s.close();
@@ -208,46 +262,45 @@ public class API implements APIProvider {
 
     @Override
     public Result<ForumView> getForum(int id) {
+        String forumTitle;
+        String topicTitle;
+        int topicId;
+        List<SimpleTopicSummaryView> topicList = new ArrayList<SimpleTopicSummaryView>();
 
-      ForumView forum = null;
-      String query = "SELECT title, id FROM Topic";
-      List<SimpleTopicSummaryView> topicList = new ArrayList<SimpleTopicSummaryView>();
+        try {
+            PreparedStatement t = this.c.prepareStatement(
+                "SELECT name FROM Forum WHERE id = ?;"
+            );
+            t.setInt(1,id);
+            ResultSet q = t.executeQuery();
+            if (q.next()) {
+                forumTitle = q.getString("name");
+            }
+            else {
+                return Result.failure("getForum: Issue with id!");
+            }
+            t.close();
+            q.close();
 
-      try {
-          PreparedStatement s = this.c.prepareStatement(
-              query
-          );
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT id, title FROM Topic WHERE forumId = ?;"
+            );
+            s.setInt(1,id);
+            ResultSet r = s.executeQuery();
 
-          ResultSet r = s.executeQuery();
+            while (r.next()) {
+                topicTitle = r.getString("title");
+                topicId = Integer.parseInt(r.getString("id"));
+                topicList.add(new SimpleTopicSummaryView(topicId,id,topicTitle));
+            }
+            s.close();
+            r.close();
 
-          while (r.next()) {
-            String topicName = r.getString("title");
-            int topicid = r.getInt("id");
-            SimpleTopicSummaryView topic = new SimpleTopicSummaryView(topicid, id, topicName);
-            topicList.add(topic);
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
 
-          }
-          s.close();
-          r.close();
-
-          PreparedStatement s2 = this.c.prepareStatement("SELECT name FROM Forum WHERE id = ?");
-          s2.setInt(1, id);
-
-          ResultSet r2 = s2.executeQuery();
-          if (r2.next()) {
-            String name = r2.getString("name");
-            forum = new ForumView(id, name, topicList);
-          }
-
-          s2.close();
-          r2.close();
-
-      } catch (SQLException e) {
-          return Result.fatal(e.getMessage());
-      }
-
-      return Result.success(forum);
-
+        return Result.success(new ForumView(id,forumTitle,topicList));
     }
 
     @Override
@@ -304,33 +357,29 @@ public class API implements APIProvider {
         String text;
         String postedAt;
 
-        //TODO: implement check for if topic exists
-
         try {
             PreparedStatement s = this.c.prepareStatement(
-                "SELECT Post.message, Post.id, Person.username, Person.name, Post.timePosted, Topic.forumId, Topic.title FROM " +
+                "SELECT Post.message, Post.id, Person.username, Person.name, Post.timePosted, Topic.forumId, Topic.title, b.count FROM " +
                 "(" +
                 "SELECT MAX(Post.timePosted) AS mptp FROM Post WHERE Post.topicId = ? " +
                 ") a " +
                 "JOIN Post ON Post.id = a.mptp " +
                 "JOIN Person ON Person.id = Post.personId " +
-                "JOIN Topic ON Topic.id = Post.topicId;"
+                "JOIN Topic ON Topic.id = Post.topicId " +
+                "JOIN (SELECT COUNT(*) AS count, postId FROM PostLikes GROUP BY postId) b ON b.postId = Post.id;"
             );
             s.setInt(1,topicId);
             ResultSet r = s.executeQuery();
             if (r.next()) {
                 topicTitle = r.getString("Topic.title");
-                forumId = Integer.parseInt(r.getString("Topic.forumId"));
+                forumId = r.getInt("Topic.forumId");
                 text = r.getString("Post.message");
                 author = r.getString("Person.name");
                 username = r.getString("Person.username");
                 postedAt = r.getString("Post.timePosted");
-                //TODO;
-                likes = -1;
+                likes = r.getInt("b.count");
             }
-            else {
-                return Result.failure("getLatestPost: error");
-            }
+            else return Result.failure("getLatestPost: topic with this id does not exist!");
 
             PreparedStatement t = this.c.prepareStatement(
                 "SELECT COUNT(*) AS c FROM Post WHERE Post.topicId = ?;"
@@ -338,7 +387,7 @@ public class API implements APIProvider {
             t.setInt(1,topicId);
             ResultSet q = t.executeQuery();
             if (q.next()) {
-                postNumber = Integer.parseInt(q.getString("c"));
+                postNumber = q.getInt("c");
             }
             else {
                 return Result.failure("getLatestPost: error with post number");
@@ -354,21 +403,29 @@ public class API implements APIProvider {
 
     @Override
     public Result createPost(int topicId, String username, String text) {
+
         int personId;
 
-        //TODO: implement check for if topic exists
         try {
+            PreparedStatement v = this.c.prepareStatement(
+                "SELECT * FROM Topic WHERE id = ?;"
+            );
+            v.setInt(1,topicId);
+            ResultSet p = v.executeQuery();
+
+
+
+            if (!p.next()) return Result.failure("createPost: no topic with this exists!");
+
             PreparedStatement t = this.c.prepareStatement(
-                "SELECT Person.id FROM Person WHERE Person.name = ?;"
+                "SELECT Person.id FROM Person WHERE Person.username = ?;"
             );
             t.setString(1,username);
             ResultSet q = t.executeQuery();
-            if (q.next()) {
-                personId = Integer.parseInt(q.getString("Person.id"));
-            }
-            else {
-                return Result.failure("createPost: no person with this username exists!");
-            }
+
+            if (q.next()) personId = Integer.parseInt(q.getString("Person.id"));
+            else return Result.failure("createPost: no person with this username exists!");
+
             q.close();
             t.close();
 
@@ -406,16 +463,15 @@ public class API implements APIProvider {
             return Result.failure("createTopic: text cannot be empty!");
         }
         try {
-          System.out.print(username);
 
             PreparedStatement s = this.c.prepareStatement(
-                "SELECT id FROM Person WHERE Person.name = ?;" //For some reason name (i.e. UserD) is being inserted instead of username....
+                "SELECT Person.id FROM Person WHERE Person.username = ?;"
             );
             s.setString(1,username);
             ResultSet r = s.executeQuery();
 
             if (r.next()) {
-                personId = Integer.parseInt(r.getString("Person.id"));
+                personId = r.getInt("Person.id");
             }
             else {
                 return Result.failure("createTopic: no user with this username exists!");
@@ -441,11 +497,18 @@ public class API implements APIProvider {
             else {
                 return Result.failure("createTopic: failed");
             }
+            s = this.c.prepareStatement(
+                "INSERT INTO Post (message,topicId,personId,timePosted) VALUES (?,?,?,now());"
+            );
+            s.setString(1,text);
+            s.setInt(2,topicId);
+            s.setInt(3,personId);
+
+            s.executeQuery();
 
             s.close();
             r.close();
 
-            this.createPost(topicId,username,text);
             c.commit();
 
         } catch (SQLException e) {
@@ -461,14 +524,13 @@ public class API implements APIProvider {
     }
 
     @Override
-    public Result<Integer> countPostsInTopic(int topicId) {
+    public Result<Integer> countPostsInTopic(int topicId)  {
 
             int count = 0;
-            String query = "SELECT COUNT(Post.id) AS count FROM Post JOIN Topic ON Post.topicId = Topic.id WHERE Topic.id = ?";
 
             try {
                 PreparedStatement s = this.c.prepareStatement(
-                    query
+                    "SELECT COUNT(Post.id) AS c FROM Post WHERE Post.topicId = ?;"
                 );
 
                 s.setInt(1, topicId);
@@ -477,9 +539,9 @@ public class API implements APIProvider {
                 if (r.next()) {
                   count = r.getInt("count");
                 }
-                s.close();
-                r.close();
 
+                r.close();
+                s.close();
 
             } catch (SQLException e) {
                 return Result.fatal(e.getMessage());
@@ -492,22 +554,303 @@ public class API implements APIProvider {
 
     @Override
     public Result likeTopic(String username, int topicId, boolean like) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      if (username == "" || username == null) return Result.failure("likeTopic: username cannot be empty!");
+
+      try {
+          int personId;
+
+          PreparedStatement s = this.c.prepareStatement(
+              "SELECT id FROM Person WHERE username = ?;"
+          );
+
+          s.setString(1,username);
+          ResultSet r = s.executeQuery();
+
+          if (r.next())  personId = r.getInt("id");
+          else return Result.failure("likeTopic: no person with this username exists!");
+
+          r.close();
+          s.close();
+
+          s = this.c.prepareStatement(
+              "SELECT id FROM Topic WHERE id = ?"
+          );
+
+          s.setInt(1,topicId);
+          r = s.executeQuery();
+
+          if (!r.next()) return Result.failure("likeTopic: topic id does not exist!");
+
+          r.close();
+          s.close();
+
+          s = this.c.prepareStatement(
+              "SELECT * FROM TopicLikes WHERE topicId = ? AND personId = ?;"
+          );
+
+          s.setInt(1,topicId);
+          s.setInt(2,personId);
+
+          r = s.executeQuery();
+          s.close();
+
+          if (r.next()) {
+              if (like) return Result.failure("likeTopic: topic has already been liked!");
+              else {
+                  s = this.c.prepareStatement(
+                      "DELETE FROM TopicLikes WHERE TopicId = ? AND personId = ?;"
+                  );
+
+                  s.setInt(1,topicId);
+                  s.setInt(2,personId);
+
+                  s.executeQuery();
+                  s.close();
+              }
+          }
+          else {
+              if (like) {
+                  s = this.c.prepareStatement(
+                      "INSERT INTO TopicLikes (topicId,personId) VALUES (?,?);"
+                  );
+
+                  s.setInt(1,topicId);
+                  s.setInt(2,personId);
+
+                  s.executeQuery();
+                  s.close();
+              }
+              else return Result.failure("likeTopic: cannot unlike post that has not been liked!");
+          }
+
+          c.commit();
+
+
+      } catch (SQLException e) {
+          try {
+              c.rollback();
+          } catch (SQLException f) {
+              return Result.fatal(f.getMessage());
+          }
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success();
+
     }
 
     @Override
     public Result likePost(String username, int topicId, int post, boolean like) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+        if (username == "" || username == null) return Result.failure("likePost: username cannot be empty!");
+
+        int personId;
+
+        try {
+
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT id FROM Person WHERE username = ?;"
+            );
+
+            s.setString(1,username);
+            ResultSet r = s.executeQuery();
+
+            if (r.next()) personId = r.getInt("id");
+            else return Result.failure("likePost: no person with this username exists!");
+
+            r.close();
+            s.close();
+
+            s = this.c.prepareStatement(
+                "SELECT * FROM Post " +
+                "JOIN Topic ON Post.topicId = Topic.id " +
+                "WHERE Post.id = ?;"
+            );
+
+            s.setInt(1,post);
+            r = s.executeQuery();
+
+            if (!r.next()) return Result.failure("likePost: topic id or post id do not exist!");
+
+            r.close();
+            s.close();
+
+            s = this.c.prepareStatement(
+                "SELECT * FROM PostLikes WHERE postId = ? AND personId = ?;"
+            );
+
+            s.setInt(1,post);
+            s.setInt(2,personId);
+
+            r = s.executeQuery();
+            s.close();
+
+            if (r.next()) {
+                if (like) return Result.failure("likePost: post has already been liked!");
+                else {
+                    s = this.c.prepareStatement(
+                        "DELETE FROM PostLikes WHERE postId = ? AND personId = ?;"
+                    );
+
+                    s.setInt(1,post);
+                    s.setInt(2,personId);
+
+                    s.executeQuery();
+                    s.close();
+                }
+            }
+            else {
+                if (like) {
+                    s = this.c.prepareStatement(
+                        "INSERT INTO PostLikes (postId,personId) VALUES (?,?);"
+                    );
+
+                    s.setInt(1,post);
+                    s.setInt(2,personId);
+
+                    s.executeQuery();
+                    s.close();
+                }
+                else return Result.failure("likePost: cannot unlike post that has not been liked!");
+            }
+
+            c.commit();
+
+
+        } catch (SQLException e) {
+            try {
+                c.rollback();
+            } catch (SQLException f) {
+                return Result.fatal(f.getMessage());
+            }
+            return Result.fatal(e.getMessage());
+        }
+
+        return Result.success();
     }
 
     @Override
     public Result<List<PersonView>> getLikers(int topicId) {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+      List<PersonView> likers = new ArrayList<PersonView>();
+      String name;
+      String username;
+      String studentId;
+
+
+      try {
+
+         PreparedStatement s = this.c.prepareStatement(
+             "SELECT id FROM topic WHERE id = ?"
+          );
+
+          ResultSet r = s.executeQuery();
+          if (!r.next()) {
+            return Result.failure("getLikers: topic with this id does not exist!");
+          }
+          s.close();
+          r.close();
+
+
+          s = this.c.prepareStatement(
+          "SELECT TopicLikes.personId, Person.name, Person.username, Person.stuId FROM TopicLikes " +
+          "JOIN Person ON TopicLikes.personId = Person.id " +
+          "WHERE topicId = ? " +
+          "ORDER BY personId;"
+          );
+
+          s.setInt(1,topicId);
+
+          r = s.executeQuery();
+
+          while (r.next()) {
+              name = r.getString("Person.name");
+              username = r.getString("Person.username");
+              studentId = r.getString("Person.stuId");
+              likers.add(new PersonView(name, username, studentId));
+          }
+
+          r.close();
+          s.close();
+
+
+      } catch (SQLException e) {
+          return Result.fatal(e.getMessage());
+      }
+
+      return Result.success(likers);
+
     }
 
     @Override
     public Result<TopicView> getTopic(int topicId) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        List<PostView> posts = new ArrayList<PostView>();
+        int forumId;
+        String forumName;
+        String title;
+        int postNumber = 0;
+        String authorName;
+        String authorUserName;
+        String text;
+        String postedAt;
+        int likes;
+
+        try {
+
+            PreparedStatement s = this.c.prepareStatement(
+                "SELECT Forum.Id, Forum.Name, Topic.title FROM Topic " +
+                "JOIN Forum ON Forum.id = Topic.forumId " +
+                "WHERE Topic.id = ?;"
+            );
+
+            s.setInt(1,topicId);
+
+            ResultSet r = s.executeQuery();
+
+            if (r.next()) {
+                forumName = r.getString("Forum.Name");
+                forumId = r.getInt("Forum.Id");
+                title = r.getString("Topic.title");
+            }
+            else return Result.failure("geTopic: topic with this id does not exist!");
+
+            s.close();
+            r.close();
+
+            s = this.c.prepareStatement(
+                "SELECT Post.id, Person.name, Person.username," +
+                "       Post.message, Post.timePosted, a.likes FROM Post " +
+                "JOIN Person ON Person.id = Post.personId " +
+                "LEFT OUTER JOIN ( " +
+                "    SELECT postId, COUNT(*) AS likes FROM PostLikes GROUP BY postId " +
+                ") a ON a.postId = Post.id " +
+                "WHERE Post.topicId = ? " +
+                "ORDER BY Post.timePosted ASC;"
+            );
+
+            s.setInt(1,topicId);
+            r = s.executeQuery();
+
+            while (r.next()) {
+                ++postNumber;
+                authorName = r.getString("Person.name");
+                authorUserName = r.getString("Person.username");
+                text = r.getString("Post.message");
+                postedAt = r.getString("Post.timePosted");
+                likes = r.getInt("a.likes");
+                posts.add(new PostView(forumId,topicId,postNumber,authorName,authorUserName,text,postedAt,likes));
+            }
+
+            r.close();
+            s.close();
+
+
+        } catch (SQLException e) {
+            return Result.fatal(e.getMessage());
+        }
+
+        return Result.success(new TopicView(forumId,topicId,forumName,title,posts));
     }
 
     /* B.2 */
