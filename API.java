@@ -70,16 +70,15 @@ public class API implements APIProvider {
     @Override
     public Result<PersonView> getPersonView(String username) {
 
-        if (username == "" || username == null) return Result.failure("getPersonView: username cannot be empty!");
+        if (username == null || username.isEmpty()) return Result.failure("getPersonView: username cannot be empty!");
 
         try {
 
             String name;
-            String user;
             String studentId;
 
             PreparedStatement s = this.c.prepareStatement(
-                "SELECT name, username, stuId FROM Person WHERE username = ?;"
+                "SELECT name, stuId FROM Person WHERE username = ?;"
             );
 
             s.setString(1, username);
@@ -88,7 +87,6 @@ public class API implements APIProvider {
 
             if (r.next()) {
                 name = r.getString("name");
-                user = r.getString("username");
                 studentId = r.getString("stuId");
             }
             else return Result.failure("getPersonView: person with this username does not exist!");
@@ -107,9 +105,9 @@ public class API implements APIProvider {
     @Override
     public Result addNewPerson(String name, String username, String studentId) {
 
-        if (name == "" || name == null) return Result.failure("addNewPerson: name cannot be empty!");
-        if (username == "" || username == null) return Result.failure("addNewPerson: username cannot be empty!");
-        if (studentId == "") return Result.failure("addNewPerson: studentId cannot be empty!");
+        if (name == null || name.isEmpty()) return Result.failure("addNewPerson: name cannot be empty!");
+        if (username == null || username.isEmpty()) return Result.failure("addNewPerson: username cannot be empty!");
+        if (studentId.isEmpty()) return Result.failure("addNewPerson: studentId cannot be empty!");
 
         try {
 
@@ -172,7 +170,7 @@ public class API implements APIProvider {
     @Override
     public Result createForum(String title) {
 
-        if (title == "" || title == null) return Result.failure("createForum: title cannot be empty!");
+        if (title == null || title.isEmpty()) return Result.failure("createForum: title cannot be empty!");
 
         try {
 
@@ -363,14 +361,19 @@ public class API implements APIProvider {
             String postedAt;
 
             PreparedStatement s = this.c.prepareStatement(
-                "SELECT Post.message, Post.id, Person.username, Person.name, Post.timePosted, Topic.forumId, Topic.title, b.count FROM " +
-                "(" +
-                "SELECT MAX(Post.timePosted) AS mptp FROM Post WHERE Post.topicId = ? " +
-                ") a " +
-                "JOIN Post ON Post.id = a.mptp " +
+                "SELECT Post.message, Post.id, Person.username, Person.name, a.mptp, Topic.forumId, Topic.title, b.count, c.count FROM Post " +
+                "JOIN ( " +
+                "    SELECT MAX(Post.timePosted) AS mptp FROM Post GROUP BY Post.topicId " +
+                ") a ON a.mptp = Post.timePosted " +
                 "JOIN Person ON Person.id = Post.personId " +
                 "JOIN Topic ON Topic.id = Post.topicId " +
-                "JOIN (SELECT COUNT(*) AS count, postId FROM PostLikes GROUP BY postId) b ON b.postId = Post.id;"
+                "LEFT OUTER JOIN ( " +
+                "    SELECT COUNT(*) AS count, PostLikes.postId AS plpid FROM PostLikes GROUP BY PostLikes.postId " +
+                ") b ON b.plpid = Post.id " +
+                "JOIN ( " +
+                "    SELECT COUNT(*) AS count, Post.topicId AS ptid FROM Post GROUP BY Post.topicId " +
+                ") c ON c.ptid =  Post.topicId " +
+                "WHERE Post.topicId = ?;"
             );
             s.setInt(1,topicId);
             ResultSet r = s.executeQuery();
@@ -381,21 +384,13 @@ public class API implements APIProvider {
                 text = r.getString("Post.message");
                 author = r.getString("Person.name");
                 username = r.getString("Person.username");
-                postedAt = r.getString("Post.timePosted");
+                postedAt = r.getString("a.mptp");
                 likes = r.getInt("b.count");
+                postNumber = r.getInt("c.count");
             }
             else return Result.failure("getLatestPost: topic with this id does not exist!");
 
             s.close();
-
-            s = this.c.prepareStatement(
-                "SELECT COUNT(*) AS c FROM Post WHERE Post.topicId = ?;"
-            );
-            s.setInt(1,topicId);
-            r = s.executeQuery();
-
-            if (r.next()) postNumber = r.getInt("c");
-            else return Result.failure("getLatestPost: error with post number");
 
             return Result.success(new PostView(forumId, topicId, postNumber, author, username, text, postedAt, likes));
 
@@ -409,6 +404,9 @@ public class API implements APIProvider {
 
         try {
 
+            if (text == null || text.isEmpty()) return Result.failure("createPost: post text cannot be empty!");
+            if (username == null || username.isEmpty()) return Result.failure("createPost: username cannot be empty!");
+
             int personId;
 
             PreparedStatement s = this.c.prepareStatement(
@@ -416,8 +414,6 @@ public class API implements APIProvider {
             );
             s.setInt(1,topicId);
             ResultSet r = s.executeQuery();
-
-
 
             if (!r.next()) return Result.failure("createPost: no topic with this exists!");
             s.close();
@@ -459,12 +455,8 @@ public class API implements APIProvider {
     @Override
     public Result createTopic(int forumId, String username, String title, String text) {
 
-        if (title == "" || title == null) {
-            return Result.failure("createTopic: title cannot be empty!");
-        }
-        if (text == "" || text == null) {
-            return Result.failure("createTopic: text cannot be empty!");
-        }
+        if (title == null || title.isEmpty()) return Result.failure("createTopic: title cannot be empty!");
+        if (text == null || text.isEmpty()) return Result.failure("createTopic: text cannot be empty!");
 
         try {
 
@@ -552,7 +544,7 @@ public class API implements APIProvider {
     @Override
     public Result likeTopic(String username, int topicId, boolean like) {
 
-        if (username == "" || username == null) return Result.failure("likeTopic: username cannot be empty!");
+        if (username == null || username.isEmpty()) return Result.failure("likeTopic: username cannot be empty!");
 
         try {
 
@@ -632,7 +624,7 @@ public class API implements APIProvider {
     @Override
     public Result likePost(String username, int topicId, int post, boolean like) {
 
-        if (username == "" || username == null) return Result.failure("likePost: username cannot be empty!");
+        if (username == null || username.isEmpty()) return Result.failure("likePost: username cannot be empty!");
 
         try {
 
@@ -736,7 +728,7 @@ public class API implements APIProvider {
                 "SELECT TopicLikes.personId, Person.name, Person.username, Person.stuId FROM TopicLikes " +
                 "JOIN Person ON TopicLikes.personId = Person.id " +
                 "WHERE topicId = ? " +
-                "ORDER BY personId;"
+                "ORDER BY personId ASC;"
             );
 
             s.setInt(1,topicId);
@@ -838,7 +830,7 @@ public class API implements APIProvider {
     @Override
     public Result<AdvancedPersonView> getAdvancedPersonView(String username) {
 
-        if (username == null || username == "") return Result.failure("getPersonView: username cannot be empty!");
+        if (username == null || username.isEmpty()) return Result.failure("getPersonView: username cannot be empty!");
 
         try {
 
