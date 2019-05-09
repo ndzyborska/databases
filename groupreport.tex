@@ -1,0 +1,78 @@
+\documentclass{article}
+\usepackage{amsmath}
+
+\begin{document}
+
+\author{
+	\texttt{24978}
+	\and
+	\texttt{97395}
+}
+\title{Coursework 2: Group Report}
+\maketitle
+
+\section*{Task 1: Schema Design}
+
+\subsection*{Normalisation}
+
+The scheme as in 1NF as none of the tables contain collection valued attributes. 
+
+The Person table has two candidate keys, id and username. As both these candidate keys contain a single attribute there cannot exist any non-trivial partial functional dependencies. The Forum table again contains two candidate keys but for the previously stated reason there cannot exist any non-trivial functional dependencies. The topic table contains only one candidate key, \texttt{id}. This is justified as none of the other parameters are guaranteed to be unique, i.e. two topics can exist with the same \texttt{title}, \texttt{message}, \texttt{forumId} and \texttt{personId}. This candidate key only contains a single attribute so again there can be no non-trivial partial functional dependencies. The same arguments can be used to deduce that the Post, PostLikes and TopicLikes tables all contain no non-trivial partial functional dependencies. Therefore, the scheme is in 2NF.
+
+
+
+\newpage
+\section*{Task 2: Method Implementation}
+
+\subsection*{getUsers}
+
+For this method the database is queried to return all the pairs of names and usernames in the database. These pairs are then iterated through and added to the hash map which is then returned.
+
+\subsection*{getPersonView}
+
+\subsection*{addNewPerson}
+
+\subsection*{getSimpleForums}
+
+\subsection*{createForum}
+
+\subsection*{getForums}
+
+This method uses a single query that retrieves the information for all forums. A complex join was required to retrieve the topic within a forum which has had a post made in it most recently. The results are then iterated through and added to the lost of ForumSummaryViews. The topicId was retrieved as a string instead of an integer. This is to deal with the case where a forum has no topics within it. If the topicId string is not null it is then converted to an integer.
+
+\subsection*{getForum}
+
+\subsection*{getSimpleTopic}
+
+\subsection*{getLatestPost}
+
+This method uses a single query to get the information needed to construct the required PostView, joins are used to get the latest post by choosing the post with the largest time posted. Joins are also used to get the number of likes the post has as well as the post number.
+
+\subsection*{createPost}
+
+The method first checks that the text and username given as input are not null or empty. A query is used to check that the topic with the given ID exists and another query is used to check that a person with the given username exists. The post is then inserted into the database.
+
+\subsection*{createTopic}
+
+This method begins by checking that the title and text arguments are not empty or null. A query is then used to retrieve the persons ID from there username. The topic is then inserted into the database. \texttt{RETURN\_GENERATED\_KEYS} is used to find the ID of the topic which has been inserted into the database. This key is then used when inserting the initial post of the topic into the Post table in the database.
+
+\subsection*{countPostsInTopic}
+
+\subsection*{likeTopic}
+
+\subsection*{likePost}
+
+The method checks that the person liking the post exists and gets the ID of this person if they exist. The existence of a topic with this ID is then checked. Then a query is done to check whether there is a database entry for this post being liked by this person. If there is and the \texttt{like} boolean is true then an error is returned as the post has already been liked. If there is and the \texttt{like} boolean is false then the entry is removed from the PostLikes table in the database. If there is no database entry, essentially the reverse is done, if \texttt{like} is true, an entry is inserted into the PostLikes table and if \texttt{like} is false then an error is returned.
+
+\subsection*{getLikers}
+
+\subsection*{getTopic}
+
+This method begins by checking the existence of a topic with this ID in the database and if so retrieves the necessary information about the topic and the forum it is contained in. Another query is then used to get the posts contained within the topic, with a left outer join with the PostLikes table being used to get the number of likes each post has. The results are then iterated through and added to the list of PostViews.
+
+\subsection*{getAdvancedPersonView}
+
+This method required complex SQL queries in order to avoid querying the database in a loop. In the first query two left outer joins are used to retrieve the the number of likes posts and topics created by this user have received. Another lengthy query is then used to get the rest of the required information. Separate joins were required to get the information about the creation of the topic, the information about the most recent post within the topic, the number of topic likes and number of post likes for all the topics which have been liked by the user. These results are then iterated through and added to the list of TopicSummaryViews.
+
+\end{document}
+
