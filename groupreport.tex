@@ -13,6 +13,20 @@
 
 \section*{Task 1: Schema Design}
 
+\subsection*{Schema}
+
+The schema was arranged into  \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}.
+We kept the tables as simple as possible so that space could be optimised.
+The Post belongs to a Topic, which belongs to a Forum. This arrangment meant the Post contained a foreign key to the Topic, which contained a foreign key to the Forum. This made the most sense, as a Forum has a 1 to many relation with Topic, and Topic has a one to many relationship with Post. In this way, we could keep the forum table compact with only 2 collumns.
+The Topic and Post also contained o foregin key to the person who created the associated post/topic.
+The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which showed on the forum view page. It would also aid in ordering the posts in the topics, so the are in the correct order.
+
+The PostLikes contained a foreign key to the person and the post. This is because there can be many likes to 1 post. 
+
+
+
+Hello \texttt{title} I'm bold
+
 \subsection*{Normalisation}
 
 The scheme as in 1NF as none of the tables contain collection valued attributes. 
@@ -30,9 +44,15 @@ For this method the database is queried to return all the pairs of names and use
 
 \subsection*{getPersonView}
 
+This method returned a PersonView object, which required a username, name (NOT NULL) and student ID (NULL) to create an instance. For this, a query was made which selected name and stuId based on the input username. The ResultSet checked if there was a result and filled the parameters to be inputed to the PersonView instance. Else, a failure was made that the user does not exits.
+
 \subsection*{addNewPerson}
 
+First, it was important to check that all the inputs were not empty, and username and name were not null. Then, an insert query was formulated which inserted each input into the appropriate collumns using setString.
+
 \subsection*{getSimpleForums}
+
+
 
 \subsection*{createForum}
 
