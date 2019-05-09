@@ -16,16 +16,16 @@
 \subsection*{Schema}
 
 The schema was arranged into  \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}.
-We kept the tables as simple as possible so that space could be optimised.
+The tables were kept as simple as possible so that space could be optimised.
 The Post belongs to a Topic, which belongs to a Forum. This arrangment meant the Post contained a foreign key to the Topic, which contained a foreign key to the Forum. This made the most sense, as a Forum has a 1 to many relation with Topic, and Topic has a one to many relationship with Post. In this way, we could keep the forum table compact with only 2 collumns.
-The Topic and Post also contained o foregin key to the person who created the associated post/topic.
-The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which showed on the forum view page. It would also aid in ordering the posts in the topics, so the are in the correct order.
+The Topic and Post also contained a foregin key to the person who created the associated post/topic.
+The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which was displayed on the forum view page. It would also aid in ordering the posts in the topics, so they are in the correct order.
 
-The PostLikes contained a foreign key to the person and the post. This is because there can be many likes to 1 post. 
+The PostLikes contained a foreign key to the person and the post. This is because there can be many likes to 1 post. 1 Like is also associated to 1 person.
+This was likewise with the TopicLikes table.
 
+All of the variables in the schema were defined as NOT NULL EXCEPT the StuId. This could be null depending on whether the Person was a student or not. All other variables were set to not null because they were required to be a valid input.
 
-
-Hello \texttt{title} I'm bold
 
 \subsection*{Normalisation}
 
@@ -37,6 +37,12 @@ The Person table has two candidate keys, id and username. As both these candidat
 
 \newpage
 \section*{Task 2: Method Implementation}
+
+\subsection*{}
+
+In general, the methods used a Prepared statement to execute queries which were set to the API connector. These queries used placholders as \texttt{xxxxx}. After the query was executed, the PrepareStatment was closed using the .close() method, and the Connection c was commited, using the .commit(). This allowed \texttt{xxxxx}. 
+
+To handle errors, 
 
 \subsection*{getUsers}
 
@@ -52,6 +58,7 @@ First, it was important to check that all the inputs were not empty, and usernam
 
 \subsection*{getSimpleForums}
 
+This method required a return List of SimpleForumSummaryView. This object required a title and an id to create an instance. An array list was created
 
 
 \subsection*{createForum}
