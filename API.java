@@ -107,9 +107,11 @@ public class API implements APIProvider {
 
         if (name == null || name.isEmpty()) return Result.failure("addNewPerson: name cannot be empty!");
         if (username == null || username.isEmpty()) return Result.failure("addNewPerson: username cannot be empty!");
-        if (studentId.isEmpty()) return Result.failure("addNewPerson: studentId cannot be empty!");
+        if (studentId != null && studentId.isEmpty()) return Result.failure("addNewPerson: studentId cannot be empty!");
 
         try {
+
+            if (studentId == null) studentId = "";
 
             PreparedStatement s = this.c.prepareStatement(
                 "INSERT INTO Person (name, username, stuId) VALUES (?, ?, ?);"
@@ -475,13 +477,12 @@ public class API implements APIProvider {
             s.close();
 
             s = this.c.prepareStatement(
-                "INSERT INTO Topic (title,message,forumId,personId) VALUES (?,?,?,?);",
+                "INSERT INTO Topic (title,forumId,personId) VALUES (?,?,?);",
                 Statement.RETURN_GENERATED_KEYS
             );
             s.setString(1,title);
-            s.setString(2,text);
-            s.setInt(3,forumId);
-            s.setInt(4,personId);
+            s.setInt(2,forumId);
+            s.setInt(3,personId);
 
             s.executeQuery();
             r = s.getGeneratedKeys();
@@ -629,6 +630,7 @@ public class API implements APIProvider {
         try {
 
             int personId;
+            int postId;
 
             PreparedStatement s = this.c.prepareStatement(
                 "SELECT id FROM Person WHERE username = ?;"
@@ -643,15 +645,15 @@ public class API implements APIProvider {
             s.close();
 
             s = this.c.prepareStatement(
-                "SELECT * FROM Post " +
-                "JOIN Topic ON Post.topicId = Topic.id " +
-                "WHERE Post.id = ?;"
+                "SELECT Post.id FROM Post WHERE Post.topicId = ? ORDER BY Post.timePosted ASC LIMIT 1 OFFSET ?;"
             );
+            s.setInt(1,topicId);
+            s.setInt(2,post-1);
 
-            s.setInt(1,post);
             r = s.executeQuery();
 
-            if (!r.next()) return Result.failure("likePost: topic id or post id do not exist!");
+            if (r.next()) postId = r.getInt("Post.id");
+            else return Result.failure("likePost: topic id or post id do not exist!");
 
             s.close();
 
@@ -659,7 +661,7 @@ public class API implements APIProvider {
                 "SELECT * FROM PostLikes WHERE postId = ? AND personId = ?;"
             );
 
-            s.setInt(1,post);
+            s.setInt(1,postId);
             s.setInt(2,personId);
 
             r = s.executeQuery();
@@ -671,7 +673,7 @@ public class API implements APIProvider {
                     s = this.c.prepareStatement(
                         "DELETE FROM PostLikes WHERE postId = ? AND personId = ?;"
                     );
-                    s.setInt(1,post);
+                    s.setInt(1,postId);
                     s.setInt(2,personId);
 
                     s.executeQuery();
@@ -683,7 +685,7 @@ public class API implements APIProvider {
                     s = this.c.prepareStatement(
                         "INSERT INTO PostLikes (postId,personId) VALUES (?,?);"
                     );
-                    s.setInt(1,post);
+                    s.setInt(1,postId);
                     s.setInt(2,personId);
 
                     s.executeQuery();
@@ -783,7 +785,7 @@ public class API implements APIProvider {
                 forumId = r.getInt("Forum.Id");
                 title = r.getString("Topic.title");
             }
-            else return Result.failure("geTopic: topic with this id does not exist!");
+            else return Result.failure("getTopic: topic with this id does not exist!");
 
             s.close();
 
