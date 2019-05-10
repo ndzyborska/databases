@@ -15,8 +15,7 @@
 
 \subsection*{Schema}
 
-The schema was arranged into  \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}.
-The tables were kept as simple as possible so that space could be optimised.
+The schema was arranged into  \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}, and the tables were kept as simple as possible so that space could be optimised.
 The Post belongs to a Topic, which belongs to a Forum. This arrangment meant the Post contained a foreign key to the Topic, which contained a foreign key to the Forum. This made the most sense, as a Forum has a 1 to many relation with Topic, and Topic has a one to many relationship with Post. In this way, we could keep the forum table compact with only 2 collumns.
 The Topic and Post also contained a foregin key to the person who created the associated post/topic.
 The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which was displayed on the forum view page. It would also aid in ordering the posts in the topics, so they are in the correct order.
@@ -40,9 +39,9 @@ The Person table has two candidate keys, id and username. As both these candidat
 
 \subsection*{}
 
-In general, the methods used a Prepared statement to execute queries which were set to the API connector. These queries used placholders as \texttt{xxxxx}. After the query was executed, the PrepareStatment was closed using the .close() method, and the Connection c was commited, using the .commit(). This allowed \texttt{xxxxx}. 
+In general, the methods used a Prepared statement to execute queries which were set to the API connector. These queries used placholders as \texttt{xxxxx}. After the query was executed, the PrepareStatment was closed using the .close() method, and the Connection c was commited, using the .commit(). This allowed \texttt{xxxxx}.
 
-To handle errors, 
+To handle errors, all of the prepare statments were placed in a try statement. This allowed capture of database errors, which returned a fatal result. Within the "create" methods, it was necessary to further investigate errors within the catch statement to ensure the database did not get filled incorrectly. Here, we used the connection rollback method inside another try statement.
 
 \subsection*{getUsers}
 
@@ -58,10 +57,12 @@ First, it was important to check that all the inputs were not empty, and usernam
 
 \subsection*{getSimpleForums}
 
-This method required a return List of SimpleForumSummaryView. This object required a title and an id to create an instance. An array list was created
+This method required a returned arraylist of SimpleForumSummaryView's. This object required a title and an id to create an instance. An array list was created and all id's and names were selected from, the forum table in the prepare statment. The result set iterated through the contents of the table where the id and name were retrived and added to the SimpleForumSumarryView arraylist, and returned as success when the iteration was complete.
 
 
 \subsection*{createForum}
+
+This method required and insert into the Forum table. First, the input title was checked so it was not null/empty. The first prepare statement was executed to check the title exists already, which would return a Result.failure if true. Following, an insert query was made in and the string was set to the input title. A connection rollback method was implemented inside the catch statment, so that if a database error occured, it would not fill up the table incorrectly.
 
 \subsection*{getForums}
 
@@ -69,29 +70,41 @@ This method uses a single query that retrieves the information for all forums. A
 
 \subsection*{getForum}
 
+This method required a return of the Forum View object. The Forum view contained a forum id, a forum title and a List of SimpleTopicSummaryView's (which require a topicId, forumId and a topic title). This was split into 2 prepare statments in order to send the correct errors relative to the appropriate table. The first statement got the forum title where the id = the input. The second got the id and title from the topic where the foreign key of the forum = input forum id. This allowed a list to be generated, by iterating through the result set and creating the SimpleTopicSummaryView arraylist. After complettion the Forum View instance was set.
+
+
 \subsection*{getSimpleTopic}
+
+This method returned a SimpleTopicView, which contained a topicid, title and arraylist of the SimplePostView object. This object contained a postNumber, author, text and time when posted. The input topicId is check using a prepare statement, which check an entry with that id exists. If true, and the result set has a next, the title is retieved from the database and saved. For the next statement, a the post information is retrived from the post table, and joined onto the person table using the Post tables foreign key. As the Posts are iterated through using a resultset, the relevant information is saved and inserted into the arraylists of SimplePostView instances. When complete the SimpleTopicView instance could be created and returned.
 
 \subsection*{getLatestPost}
 
-This method uses a single query to get the information needed to construct the required PostView, joins are used to get the latest post by choosing the post with the largest time posted. Joins are also used to get the number of likes the post has as well as the post number.
+A single query is used to get the information needed to construct the required PostView, joins are used to get the latest post by choosing the post with the largest time posted. Joins are also used to get the number of likes the post has as well as the post number.
 
 \subsection*{createPost}
 
-The method first checks that the text and username given as input are not null or empty. A query is used to check that the topic with the given ID exists and another query is used to check that a person with the given username exists. The post is then inserted into the database.
+First, this method checks that the text and username given as input are not null or empty. A query is used to check that the topic with the given ID exists and another query is used to check that a person with the given username exists. The post is then inserted into the database.
 
 \subsection*{createTopic}
 
-This method begins by checking that the title and text arguments are not empty or null. A query is then used to retrieve the persons ID from there username. The topic is then inserted into the database. \texttt{RETURN\_GENERATED\_KEYS} is used to find the ID of the topic which has been inserted into the database. This key is then used when inserting the initial post of the topic into the Post table in the database.
+createTopic begins by checking that the title and text arguments are not empty or null. A query is then used to retrieve the persons ID from there username. The topic is then inserted into the database. \texttt{RETURN\_GENERATED\_KEYS} is used to find the ID of the topic which has been inserted into the database. This key is then used when inserting the initial post of the topic into the Post table in the database.
 
 \subsection*{countPostsInTopic}
 
+A count of posts is returned via an SQL query, wherby the count is selected from the Post table where the topic id is equal to the input. If there are no results in the result set, it means that there is no such topic id, which will return a failure. If not the count will be returned succesfully.
+
 \subsection*{likeTopic}
+
+In order to like a topic, the schema requires an insert to be made into the TopicLikes table. For this, 2 queries are executed to check the topic id AND the username exists in the Topic and Person tables. Following, a query is set to select all the TopicLikes, to check if there are any likes associated to the input topic and person. If true and the like is set to true, an error is sent that the post has already been liked. If false and the like is set to false/dislike, then the row is deleted from the table.
+Finally, if there is no results with the associated topic or person AND like is set to true, an insert statement is prepared to create an entry of the input topic and person using the ids retrived from the previous resultSets. If the like is set to dislike, an error is sent whereby a topic cannot be disliked if it has not been liked.
 
 \subsection*{likePost}
 
 The method checks that the person liking the post exists and gets the ID of this person if they exist. The existence of a topic with this ID is then checked. Then a query is done to check whether there is a database entry for this post being liked by this person. If there is and the \texttt{like} boolean is true then an error is returned as the post has already been liked. If there is and the \texttt{like} boolean is false then the entry is removed from the PostLikes table in the database. If there is no database entry, essentially the reverse is done, if \texttt{like} is true, an entry is inserted into the PostLikes table and if \texttt{like} is false then an error is returned.
 
 \subsection*{getLikers}
+
+This method must return a list of PersonView objects which contains a name, username and student id. A PrepareStatement was created to check the input topic id exists to send the appropriate error. Another prepare statement was created to select the person information by joining th Person table onto the TopicLikes table, and ordered in terms of \texttt{personIds}. A resultSet is used to iterated through the list and add them to the array list of PersonView objects, and returned.
 
 \subsection*{getTopic}
 
