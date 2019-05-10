@@ -15,33 +15,27 @@
 
 \subsection*{Schema}
 
-The schema was arranged into  \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}, and the tables were kept as simple as possible so that space could be optimised.
-The Post belongs to a Topic, which belongs to a Forum. This arrangment meant the Post contained a foreign key to the Topic, which contained a foreign key to the Forum. This made the most sense, as a Forum has a 1 to many relation with Topic, and Topic has a one to many relationship with Post. In this way, we could keep the forum table compact with only 2 collumns.
-The Topic and Post also contained a foregin key to the person who created the associated post/topic.
-The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which was displayed on the forum view page. It would also aid in ordering the posts in the topics, so they are in the correct order.
+The schema was arranged into \texttt{Person, Forum, Topic, Post, PostLikes} and \texttt{TopicLikes}, and the tables were kept as simple as possible so that space could be optimised.
+The Post belongs to a Topic, which belongs to a Forum. This arrangement meant the Post contained a foreign key to the Topic, which contained a foreign key to the Forum. This made the most sense, as a Forum has a 1-to-many relationship with Topic, and Topic has a 1-to-many relationship with Post. In this way, we could keep the forum table compact with only 2 columns.
+The Topic and Post also contained a foreign key to the person who created the associated post/topic.
+The Post contained a message and a timePosted variable. This was important to include as it indicated which topic was posted into most recently, which was displayed on the forum view page. It would also aid in ordering the posts in the topics, so they were in the correct order.
 
 The PostLikes contained a foreign key to the person and the post. This is because there can be many likes to 1 post. 1 Like is also associated to 1 person.
 This was likewise with the TopicLikes table.
-
-All of the variables in the schema were defined as NOT NULL EXCEPT the StuId. This could be null depending on whether the Person was a student or not. All other variables were set to not null because they were required to be a valid input.
-
-
+All the variables in the schema were defined as NOT NULL EXCEPT the StuId. This could be null depending on whether the Person was a student or not. All other variables were set to not null because they were required to create a valid input.
 \subsection*{Normalisation}
 
-The scheme as in 1NF as none of the tables contain collection valued attributes. 
-
-The Person table has two candidate keys, id and username. As both these candidate keys contain a single attribute there cannot exist any non-trivial partial functional dependencies. The Forum table again contains two candidate keys but for the previously stated reason there cannot exist any non-trivial functional dependencies. The topic table contains only one candidate key, \texttt{id}. This is justified as none of the other parameters are guaranteed to be unique, i.e. two topics can exist with the same \texttt{title}, \texttt{message}, \texttt{forumId} and \texttt{personId}. This candidate key only contains a single attribute so again there can be no non-trivial partial functional dependencies. The same arguments can be used to deduce that the Post, PostLikes and TopicLikes tables all contain no non-trivial partial functional dependencies. Therefore, the scheme is in 2NF.
-
-
-
+The schema is in 1NF as none of the tables contain collection valued attributes. 
+The Person table has two candidate keys, id and username. As both these candidate keys contain a single attribute, there cannot exist any non-trivial partial functional dependencies. The Forum table again contains two candidate keys but for the previously stated reason there cannot exist any non-trivial functional dependencies. The topic table contains only one candidate key, \texttt{id}. This is justified as none of the other parameters are guaranteed to be unique, i.e. two topics can exist with the same \texttt{title}, \texttt{message}, \texttt{forumId} and \texttt{personId}. This candidate key only contains a single attribute so again there can be no non-trivial partial functional dependencies. The same arguments can be used to deduce that the Post, PostLikes and TopicLikes tables all contain no non-trivial partial functional dependencies. Therefore, the scheme is in 2NF.
+\texttt{errors},
 \newpage
 \section*{Task 2: Method Implementation}
 
 \subsection*{}
 
-In general, the methods used a Prepared statement to execute queries which were set to the API connector. These queries used placholders as \texttt{xxxxx}. After the query was executed, the PrepareStatment was closed using the .close() method, and the Connection c was commited, using the .commit(). This allowed \texttt{xxxxx}.
+In general, the methods used a Prepared statement to execute queries which were set to the API connector. These queries used placeholders as \texttt{xxxxx}. After the query was executed, the PrepareStatement was closed using the .close() method, and the Connection c was committed, using the .commit(). This allowed \texttt{xxxxx}.
 
-To handle errors, all of the prepare statments were placed in a try statement. This allowed capture of database errors, which returned a fatal result. Within the "create" methods, it was necessary to further investigate errors within the catch statement to ensure the database did not get filled incorrectly. Here, we used the connection rollback method inside another try statement.
+To handle errors, all the prepare statements were placed in a try statement. This allowed capture of database errors, which returned a fatal result. Within the "create" methods, it was necessary to further investigate errors within the catch statement to ensure the database did not get filled incorrectly. Here, we used the connection rollback method inside another try statement.
 
 \subsection*{getUsers}
 
@@ -49,33 +43,31 @@ For this method the database is queried to return all the pairs of names and use
 
 \subsection*{getPersonView}
 
-This method returned a PersonView object, which required a username, name (NOT NULL) and student ID (NULL) to create an instance. For this, a query was made which selected name and stuId based on the input username. The ResultSet checked if there was a result and filled the parameters to be inputed to the PersonView instance. Else, a failure was made that the user does not exits.
+This method returned a PersonView object, which required a username, name (NOT NULL) and student ID (NULL) to create an instance. For this, a query was made which selected name and stuId based on the input username. The ResultSet checked if there was a result and filled the parameters to be imputed to the PersonView instance. Else, a failure was made that the user does not exits.
 
 \subsection*{addNewPerson}
 
-First, it was important to check that all the inputs were not empty, and username and name were not null. Then, an insert query was formulated which inserted each input into the appropriate collumns using setString.
+First, it was important to check that all the inputs were not empty, and username and name were not null. Then, an insert query was formulated which inserted each input into the appropriate columns using setString.
 
 \subsection*{getSimpleForums}
 
-This method required a returned arraylist of SimpleForumSummaryView's. This object required a title and an id to create an instance. An array list was created and all id's and names were selected from, the forum table in the prepare statment. The result set iterated through the contents of the table where the id and name were retrived and added to the SimpleForumSumarryView arraylist, and returned as success when the iteration was complete.
-
-
+This method required a returned arraylist of SimpleForumSummaryView's. This object required a title and an id to create an instance. An array list was created, and all id's and names were selected from the forum table inside the prepare statement. The result set iterated through the contents of the table where the id and name were retrieved and added to the SimpleForumSumarryView array list and returned as success when the iteration was complete.
 \subsection*{createForum}
 
-This method required and insert into the Forum table. First, the input title was checked so it was not null/empty. The first prepare statement was executed to check the title exists already, which would return a Result.failure if true. Following, an insert query was made in and the string was set to the input title. A connection rollback method was implemented inside the catch statment, so that if a database error occured, it would not fill up the table incorrectly.
+This method required and insert into the Forum table. First, the input title was checked so it was not null/empty. The first prepare statement was executed to check the title exists already, which would return a Result.failure if true. Following, an insert query was made in and the string was set to the input title. A connection rollback method was implemented inside the catch statement, so that if a database error occurred, it would not fill up the table incorrectly.
 
 \subsection*{getForums}
 
-This method uses a single query that retrieves the information for all forums. A complex join was required to retrieve the topic within a forum which has had a post made in it most recently. The results are then iterated through and added to the lost of ForumSummaryViews. The topicId was retrieved as a string instead of an integer. This is to deal with the case where a forum has no topics within it. If the topicId string is not null it is then converted to an integer.
+This method uses a single query that retrieves the information for all forums. A complex join was required to retrieve the topic within a forum which has had a post made in it most recently. The results are then iterated through and added to the list of ForumSummaryViews. The topicId was retrieved as a string instead of an integer. This is to deal with the case where a forum has no topics within it. If the topicId string is not null it is then converted to an integer.
 
 \subsection*{getForum}
 
-This method required a return of the Forum View object. The Forum view contained a forum id, a forum title and a List of SimpleTopicSummaryView's (which require a topicId, forumId and a topic title). This was split into 2 prepare statments in order to send the correct errors relative to the appropriate table. The first statement got the forum title where the id = the input. The second got the id and title from the topic where the foreign key of the forum = input forum id. This allowed a list to be generated, by iterating through the result set and creating the SimpleTopicSummaryView arraylist. After complettion the Forum View instance was set.
+This method required a return of the Forum View object. The Forum view contained a forum id, a forum title and a List of SimpleTopicSummaryView's (which require a topicId, forumId and a topic title). This was split into 2 prepare statements in order to send the correct errors relative to the appropriate table. The first statement got the forum title where the id = the input. The second got the id and title from the topic where the foreign key of the forum = input forum id. This allowed a list to be generated, by iterating through the result set and creating the SimpleTopicSummaryView arraylist. After completion the Forum View instance was set.
 
 
 \subsection*{getSimpleTopic}
 
-This method returned a SimpleTopicView, which contained a topicid, title and arraylist of the SimplePostView object. This object contained a postNumber, author, text and time when posted. The input topicId is check using a prepare statement, which check an entry with that id exists. If true, and the result set has a next, the title is retieved from the database and saved. For the next statement, a the post information is retrived from the post table, and joined onto the person table using the Post tables foreign key. As the Posts are iterated through using a resultset, the relevant information is saved and inserted into the arraylists of SimplePostView instances. When complete the SimpleTopicView instance could be created and returned.
+This method returned a SimpleTopicView, which contained a topicid, title and arraylist of the SimplePostView object. This object contained a postNumber, author, text and time when posted. The input topicId is check using a PrepareStatement, which check an entry with that id exists. If true, and the result set has a next, the title is retrieved from the database and saved. For the next statement, a the post information is retrieved from the post table, and joined onto the person table using the Post tables foreign key. As the Posts are iterated through using a ResultSet, the relevant information is saved and inserted into the ArrayLists of SimplePostView instances. When complete the SimpleTopicView instance could be created and returned.
 
 \subsection*{getLatestPost}
 
@@ -91,12 +83,12 @@ createTopic begins by checking that the title and text arguments are not empty o
 
 \subsection*{countPostsInTopic}
 
-A count of posts is returned via an SQL query, wherby the count is selected from the Post table where the topic id is equal to the input. If there are no results in the result set, it means that there is no such topic id, which will return a failure. If not the count will be returned succesfully.
+A count of posts is returned via an SQL query, whereby the count is selected from the Post table where the topic id is equal to the input. If there are no results in the result set, it means that there is no such topic id, which will return a failure. If not, the count will be returned successfully.
 
 \subsection*{likeTopic}
 
 In order to like a topic, the schema requires an insert to be made into the TopicLikes table. For this, 2 queries are executed to check the topic id AND the username exists in the Topic and Person tables. Following, a query is set to select all the TopicLikes, to check if there are any likes associated to the input topic and person. If true and the like is set to true, an error is sent that the post has already been liked. If false and the like is set to false/dislike, then the row is deleted from the table.
-Finally, if there is no results with the associated topic or person AND like is set to true, an insert statement is prepared to create an entry of the input topic and person using the ids retrived from the previous resultSets. If the like is set to dislike, an error is sent whereby a topic cannot be disliked if it has not been liked.
+Finally, if there are no results with the associated topic or person AND like is set to true, an insert statement is prepared to create an entry of the input topic and person using the ids retrieved from the previous ResultSet’s. If the like is set to dislike, an error is sent whereby a topic cannot be disliked if it has not been liked.
 
 \subsection*{likePost}
 
@@ -112,7 +104,6 @@ This method begins by checking the existence of a topic with this ID in the data
 
 \subsection*{getAdvancedPersonView}
 
-This method required complex SQL queries in order to avoid querying the database in a loop. In the first query two left outer joins are used to retrieve the the number of likes posts and topics created by this user have received. Another lengthy query is then used to get the rest of the required information. Separate joins were required to get the information about the creation of the topic, the information about the most recent post within the topic, the number of topic likes and number of post likes for all the topics which have been liked by the user. These results are then iterated through and added to the list of TopicSummaryViews.
+This method required complex SQL queries in order to avoid querying the database in a loop. In the first query two left outer joins are used to retrieve the number of likes posts and topics created by this user have received. Another lengthy query is then used to get the rest of the required information. Separate joins were required to get the information about the creation of the topic, the information about the most recent post within the topic, the number of topic likes and number of post likes for all the topics which have been liked by the user. These results are then iterated through and added to the list of TopicSummaryViews.
 
 \end{document}
-
